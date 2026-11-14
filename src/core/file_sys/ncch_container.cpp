@@ -236,6 +236,17 @@ Loader::ResultStatus NCCHContainer::LoadHeader() {
 
     LOG_DEBUG(Service_FS, "NCCH type: {}", file->GetType().to_string());
 
+    // nativeMons: some decryption tools leave the NoCrypto flag unset. As Citra did, a plain-text
+    // exheader (its jump ID matching the program ID) means the NCCH is not really encrypted.
+    if (!ncch_header.no_crypto && ncch_header.extended_header_size) {
+        ExHeader_Header exheader{};
+        if (file->ReadAtBytes(&exheader, sizeof(exheader), sizeof(NCCH_Header)) == sizeof(exheader) &&
+            (exheader.system_info.jump_id & 0xFFFFFFFF) == (ncch_header.program_id & 0xFFFFFFFF)) {
+            LOG_WARNING(Service_FS, "NCCH is marked as encrypted but its exheader is plain; loading it as decrypted");
+            ncch_header.no_crypto.Assign(1);
+        }
+    }
+
     if (!ncch_header.no_crypto) {
         // Encrypted NCCH are not supported
         return Loader::ResultStatus::ErrorEncrypted;
