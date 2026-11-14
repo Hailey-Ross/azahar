@@ -23,6 +23,8 @@ jobs:
       run:
         shell: bash
     env:
+      # The upstream release hails-additions follows (update it with each sync to a new tag).
+      UPSTREAM_TAG: 2126.2
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_COMPILERCHECK: content
       CCACHE_SLOPPINESS: time_macros
@@ -32,7 +34,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-          fetch-depth: 0
       - name: Set up cache
         uses: actions/cache@v5
         with:
@@ -58,10 +59,9 @@ jobs:
           rm -rf dist && mkdir -p dist/azahar
           cp -r build/bundle/* dist/azahar/
           cp license.txt dist/azahar/LICENSE-azahar.txt 2>/dev/null || cp LICENSE.txt dist/azahar/LICENSE-azahar.txt
-          upstream="$(git describe --tags --abbrev=0 2>/dev/null || echo unknown)"
+          upstream="$UPSTREAM_TAG"
           printf 'Azahar-modified (nativeMons)\nBased on Azahar %s (https://github.com/azahar-emu/azahar)\nSource: https://github.com/%s/tree/%s\n' \
             "$upstream" "$GITHUB_REPOSITORY" "$GITHUB_SHA" > dist/azahar/NATIVEMONS-BUILD.txt
-          echo "UPSTREAM_TAG=$upstream" >> "$GITHUB_ENV"
           if find dist -iregex '.*\.\(3ds\|cci\|cia\|cxi\|app\|sav\)$' | grep .; then echo "Game data in the package"; exit 1; fi
           (cd dist && powershell -NoProfile -Command "Compress-Archive -Path azahar -DestinationPath azahar-nativemons-windows-x64.zip")
           ls -la dist
