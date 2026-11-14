@@ -1,0 +1,76 @@
+# Builds Azahar for Windows the way upstream does (MSVC) and publishes it for the nativeMons launcher.
+# No games, keys or system files are included: players use decrypted dumps of their own cartridges.
+name: Windows release
+
+on:
+  push:
+    branches: [hails-additions]
+    paths-ignore: ["**.md", "dist/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_COMPILERCHECK: content
+      CCACHE_SLOPPINESS: time_macros
+      OS: windows
+      TARGET: msvc
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Set up cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ runner.os }}-msvc-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-msvc-
+      - name: Set up MSVC
+        uses: azahar-emu/msvc-dev-cmd@v1
+      - name: Install extra tools
+        run: choco install ccache ninja wget
+      - name: Install vulkan-sdk
+        run: |
+          wget https://sdk.lunarg.com/sdk/download/1.4.304.1/windows/VulkanSDK-1.4.304.1-Installer.exe -O D:/a/_temp/vulkan.exe
+          D:/a/_temp/vulkan.exe --accept-licenses --default-answer --confirm-command install
+      - name: Disable line ending translation
+        run: git config --global core.autocrlf input
+      - name: Build
+        run: ./.ci/windows.sh
+
+      - name: Package
+        run: |
+          rm -rf dist && mkdir -p dist/azahar
+          cp -r build/bundle/* dist/azahar/
+          cp license.txt dist/azahar/LICENSE-azahar.txt 2>/dev/null || cp LICENSE.txt dist/azahar/LICENSE-azahar.txt
+          upstream="$(git describe --tags --abbrev=0 2>/dev/null || echo unknown)"
+          printf 'Azahar-modified (nativeMons)\nBased on Azahar %s (https://github.com/azahar-emu/azahar)\nSource: https://github.com/%s/tree/%s\n' \
+            "$upstream" "$GITHUB_REPOSITORY" "$GITHUB_SHA" > dist/azahar/NATIVEMONS-BUILD.txt
+          echo "UPSTREAM_TAG=$upstream" >> "$GITHUB_ENV"
+          if find dist -iregex '.*\.\(3ds\|cci\|cia\|cxi\|app\|sav\)$' | grep .; then echo "Game data in the package"; exit 1; fi
+          (cd dist && powershell -NoProfile -Command "Compress-Archive -Path azahar -DestinationPath azahar-nativemons-windows-x64.zip")
+          ls -la dist
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="windows-${GITHUB_SHA:0:9}"
+          gh release create "$tag" dist/azahar-nativemons-windows-x64.zip \
+            --target "$GITHUB_SHA" --title "Windows build ($tag)" \
+            --notes "Azahar-modified (nativeMons), based on Azahar $UPSTREAM_TAG, for the nativeMons launcher. Built from this commit; source and license are in this repository. No games, keys or system files are included."
