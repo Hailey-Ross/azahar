@@ -20,7 +20,6 @@
 Vink deze optie in de toekomst nogmaals aan om te zien of er ondersteuning is toegevoegd!</string>
     <string name="share_log_not_found">Geen logbestand gevonden</string>
     <string name="about">Over</string>
-    <string name="citra_description">Een open-source 3DS-emulator</string>
     <string name="about_description">Bouwversie, credits en meer</string>
     <string name="theme_and_color_description">Wijzig het uiterlijk van de app</string>
     <string name="install_cia_title">Installeer CIA</string>
@@ -50,8 +49,6 @@ Vink deze optie in de toekomst nogmaals aan om te zien of er ondersteuning is to
     <string name="step_complete">Voltooid!</string>
     <string name="done">Klaar!</string>
     <string name="text_continue">Doorgaan</string>
-    <string name="notifications">notificaties</string>
-    <string name="notifications_description">Verleen de meldingsrechten met de onderstaande knop.</string>
     <string name="give_permission">Toestemming geven</string>
     <string name="notification_warning">Het verlenen van toestemming voor meldingen overslaan?</string>
     <string name="notification_warning_description">Azahar kan je niet op de hoogte stellen van belangrijke informatie.</string>

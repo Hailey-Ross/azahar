@@ -1,6 +1,6 @@
 // Copyright 2018-2026 Citra Emulator Project / Azahar Emulator Project
-// Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Licensed under GPLv3 or any later version
+// Refer to the LICENSE.txt file included.
 
 #pragma once
 
@@ -75,9 +75,28 @@ public:
 
     bool IsPersonal() const;
 
+    u32 GetConsoleID() const {
+        return ticket_body.console_id;
+    }
+    u32 GetSignatureType() const {
+        return signature_type;
+    }
+    const std::vector<u8>& GetSignature() const {
+        return ticket_signature;
+    }
+    u8 GetFormatVersion() const {
+        return ticket_body.version;
+    }
+    std::string GetIssuer() const;
+
+    std::vector<u8> GetSignedData() const;
+
     bool HasRights(u16 index) {
         return content_index.HasRights(index);
     }
+
+    /// Result of the last Load, Error if nothing was loaded.
+    Loader::ResultStatus LoadResult() const;
 
     class ContentIndex {
     public:
@@ -139,6 +158,7 @@ private:
     u32_be signature_type;
     std::vector<u8> ticket_signature;
     ContentIndex content_index;
+    std::optional<Loader::ResultStatus> load_result;
 
     size_t serialized_size = 0;
 };

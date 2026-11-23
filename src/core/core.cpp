@@ -12,8 +12,10 @@
 #include "common/logging/log.h"
 #include "common/scope_exit.h"
 #include "common/settings.h"
+#include "common/tar_file.h"
 #include "core/arm/arm_interface.h"
 #include "core/arm/exclusive_monitor.h"
+#include "core/hle/service/am/am.h"
 #include "core/hle/service/cam/cam.h"
 #include "core/hle/service/hid/hid.h"
 #include "core/hle/service/ir/ir_user.h"
@@ -21,6 +23,9 @@
 #include "core/arm/dynarmic/arm_dynarmic.h"
 #endif
 #include "core/arm/dyncom/arm_dyncom.h"
+#ifdef HAVE_FASTINTERP
+#include "core/arm/fastinterp/fastinterp.h"
+#endif
 #include "core/cheats/cheats.h"
 #include "core/core.h"
 #include "core/core_timing.h"
@@ -488,6 +493,8 @@ System::ResultStatus System::Load(Frontend::EmuWindow& emu_window, const std::st
         kernel->RestoreIPCRecorder(std::move(restore_ipc_recorder));
     }
 
+    LoadAMTitles();
+
     std::shared_ptr<Kernel::Process> process;
     const Loader::ResultStatus load_result{app_loader->Load(process)};
     if (Loader::ResultStatus::Success != load_result) {
@@ -568,6 +575,26 @@ void System::Reschedule() {
     kernel->GetThreadManager(running_core->GetID()).Reschedule();
 }
 
+void System::LoadAMTitles() {
+    auto am = Service::AM::GetModule(*this);
+    if (!am) {
+        return;
+    }
+    bool bundle_registered = false;
+    if (!GetCartridge().empty()) {
+        auto tar = FileUtil::TarArchive::OpenTarArchive(GetCartridge());
+        if (tar) {
+            tar.reset();
+            am->GetBundleCIAHandler()->RegisterBundle(GetCartridge());
+            bundle_registered = true;
+        }
+    }
+    if (!bundle_registered) {
+        app_loader->LoadBundle();
+    }
+    am->ScanForAllTitles();
+}
+
 System::ResultStatus System::Init(Frontend::EmuWindow& emu_window,
                                   Frontend::EmuWindow* secondary_window,
                                   Kernel::MemoryMode memory_mode, u32 num_cores) {
@@ -606,6 +633,13 @@ System::ResultStatus System::Init(Frontend::EmuWindow& emu_window,
                 std::make_shared<ARM_DynCom>(*this, *memory, USER32MODE, i, timing->GetTimer(i)));
         }
         LOG_WARNING(Core, "CPU JIT requested, but Dynarmic not available");
+#endif
+#ifdef HAVE_FASTINTERP
+    } else if (Settings::values.use_fastinterp) {
+        for (u32 i = 0; i < num_cores; ++i) {
+            cpu_cores.push_back(std::make_shared<FastInterp::ARM_FastInterp>(*this, *memory, i,
+                                                                             timing->GetTimer(i)));
+        }
 #endif
     } else {
         for (u32 i = 0; i < num_cores; ++i) {
@@ -943,11 +977,6 @@ void System::serialize(Archive& ar, const unsigned int file_version) {
     }
     ar & num_cores;
 
-    // TODO(PabloMK7): Figure out why this is the case
-    if (!lle_modules.empty()) {
-        throw std::runtime_error("Savestates are not supported with LLE modules enabled");
-    }
-
     ar & lle_modules;
     Kernel::MemoryMode mem_mode{};
     if (!Archive::is_loading::value) {
@@ -998,6 +1027,9 @@ void System::serialize(Archive& ar, const unsigned int file_version) {
         if (Settings::values.custom_textures) {
             custom_tex_manager->FindCustomTextures();
         }
+
+        // The title lists and bundles of AM are not saved, they come from the host files.
+        LoadAMTitles();
 
         // Re-register gpu callback, because gsp service changed after service_manager got
         // serialized
