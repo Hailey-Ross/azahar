@@ -55,7 +55,17 @@ jobs:
           }
       - name: Install extra tools
         run: choco install ccache ninja wget
-      # FFmpeg from vcpkg, at the commit and ports upstream's build.yml uses (since 2127.0).
+      # FFmpeg from vcpkg, at the commit and ports upstream's build.yml uses (since 2127.0). Its build (about
+      # 25 minutes) is cached; change the key when the vcpkg commit or the FFmpeg features change.
+      - name: Set up vcpkg cache
+        uses: actions/cache@v5
+        with:
+          path: D:/a/_temp/vcpkg-cache
+          key: ${{ runner.os }}-vcpkg-5087d22-dav1d-74f5ea4-ffmpeg-1
+      - name: Use vcpkg cache
+        run: |
+          mkdir -p D:/a/_temp/vcpkg-cache
+          echo "VCPKG_BINARY_SOURCES=clear;files,D:/a/_temp/vcpkg-cache,readwrite" >> "$GITHUB_ENV"
       - name: Checkout vcpkg for FFmpeg
         shell: pwsh
         run: |
