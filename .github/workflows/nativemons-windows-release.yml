@@ -24,7 +24,7 @@ jobs:
         shell: bash
     env:
       # The upstream release hails-additions follows (update it with each sync to a new tag).
-      UPSTREAM_TAG: "2127.0"
+      UPSTREAM_TAG: "2127.0.1"
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_COMPILERCHECK: content
       CCACHE_SLOPPINESS: time_macros
